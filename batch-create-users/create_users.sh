@@ -2,13 +2,14 @@
 
 # Path to your CSV file
 CSV_FILE="users.csv"
-LIZMAP_DIR="/var/www/stockach/lizmap"
+# Change to your lizmaps directory!
+LIZMAP_DIR="/var/www/YOURDIRECTORY/lizmap"
 
 echo "Starting user creation process..."
 echo "=================================="
 
 # Process each user
-tail -n +2 "$CSV_FILE" | while IFS=';' read -r benutzerkennung vorname nachname projekt_vg organisation emailadresse; do
+tail -n +2 "$CSV_FILE" | while IFS=';' read -r benutzerkennung vorname nachname organisation emailadresse; do
     # Skip empty lines
     if [ -z "$emailadresse" ]; then
         continue
@@ -27,10 +28,10 @@ tail -n +2 "$CSV_FILE" | while IFS=';' read -r benutzerkennung vorname nachname 
     echo "  -> Executing: php console.php jcommunity:user:create \"$username\" \"$email_lower\""
     php console.php jcommunity:user:create $username $email_lower 2>&1
     
-    # Add to group if needed
-    if [ "$projekt_vg" = "*" ]; then
-        echo "  -> Executing: php console.php acl2user:addgroup \"$username\" verwaltungsgemeinschaft"
-        php console.php acl2user:addgroup $username verwaltungsgemeinschaft 2>&1
+    # Add to group if needed - CHANGE the two occurences of -> GruppeA <- to whatever your group's name on your LWC instance is!
+    if [ "$Gruppe" = "*" ]; then
+        echo "  -> Executing: php console.php acl2user:addgroup \"$username\" GruppeA"
+        php console.php acl2user:addgroup $username GruppeA 2>&1
     fi
     
     echo "  -> Done with $username"
