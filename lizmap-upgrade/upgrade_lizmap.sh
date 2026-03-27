@@ -193,6 +193,10 @@ restore_files() {
         print_status "Restored custom JavaScript"
     fi
     
+    if [[ -d "$temp_dir/preserved/www/altiprofil" ]]; then
+        cp -r "$temp_dir/preserved/www/altiprofil" "$instance_path/lizmap/www/"
+        print_status "Restored AltiProfil"
+    fi
     # Restore logs
     if [[ -d "$temp_dir/preserved/log" ]]; then
         cp -r "$temp_dir/preserved/log" "$instance_path/lizmap/var/"
@@ -233,27 +237,54 @@ set_permissions() {
     
     print_status "Setting proper permissions..."
     
+    # Count files and directories for progress indication
+    print_status "Analyzing directory structure..."
+    local total_dirs=$(find "$instance_path" -type d 2>/dev/null | wc -l)
+    local total_files=$(find "$instance_path" -type f 2>/dev/null | wc -l)
+    print_status "Found $total_dirs directories and $total_files files"
+    
     # Set ownership to www-data (common web server user on Ubuntu)
-    chown -R www-data:www-data "$instance_path"
+    print_status "Setting ownership to www-data:www-data for entire instance..."
+    if chown -R www-data:www-data "$instance_path" 2>&1; then
+        print_success "Ownership set successfully"
+    else
+        print_warning "Some ownership changes may have failed (this might be normal)"
+    fi
     
     # Set directory permissions
-    find "$instance_path" -type d -exec chmod 755 {} \;
+    print_status "Setting directory permissions (755) for $total_dirs directories..."
+    find "$instance_path" -type d -exec chmod 755 {} \; 2>&1 | while read line; do
+        [[ -n "$line" ]] && print_warning "$line"
+    done
+    print_success "Directory permissions set"
     
     # Set file permissions
-    find "$instance_path" -type f -exec chmod 644 {} \;
+    print_status "Setting file permissions (644) for $total_files files..."
+    find "$instance_path" -type f -exec chmod 644 {} \; 2>&1 | while read line; do
+        [[ -n "$line" ]] && print_warning "$line"
+    done
+    print_success "File permissions set"
     
     # Set specific permissions for lizmap directories
     if [[ -d "$instance_path/lizmap/var" ]]; then
+        print_status "Setting enhanced permissions for lizmap/var directory..."
         chmod -R 775 "$instance_path/lizmap/var"
         chown -R www-data:www-data "$instance_path/lizmap/var"
+        print_success "lizmap/var permissions set"
+    else
+        print_warning "lizmap/var directory not found - skipping"
     fi
     
     if [[ -d "$instance_path/lizmap/www" ]]; then
+        print_status "Setting permissions for lizmap/www directory..."
         chmod -R 755 "$instance_path/lizmap/www"
         chown -R www-data:www-data "$instance_path/lizmap/www"
+        print_success "lizmap/www permissions set"
+    else
+        print_warning "lizmap/www directory not found - skipping"
     fi
     
-    print_success "Permissions set successfully"
+    print_success "All permissions set successfully"
 }
 
 # Main upgrade function
@@ -330,8 +361,16 @@ main() {
     # Restore preserved files
     restore_files "$INSTANCE_PATH" "$TEMP_DIR"
     
+    # Remove installer state so installer.php runs a fresh install
+    rm -f "$INSTANCE_PATH/lizmap/var/config/installer.ini.php"
+    
     # Set proper permissions
     set_permissions "$INSTANCE_PATH"
+    
+    # Clear compiled cache so installer picks up new files
+    rm -rf "$INSTANCE_PATH/temp/lizmap/"
+    mkdir -p "$INSTANCE_PATH/temp/lizmap/"
+    chown www-data:www-data "$INSTANCE_PATH/temp/lizmap/"
     
     # Run Lizmap installer/updater if it exists
     if [[ -f "$INSTANCE_PATH/lizmap/install/installer.php" ]]; then
