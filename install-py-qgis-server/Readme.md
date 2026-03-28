@@ -141,7 +141,7 @@ locale-gen de_DE.UTF-8 && dpkg-reconfigure locales && dpkg-reconfigure tzdata
 The latest LWC release is retrieved via the GitHub API and downloaded directly to `/var/www/`:
 
 ```bash
-cd /var/www/ && curl -s https://api.github.com/repos/3liz/lizmap-web-client/releases/latest | grep "browser_download_url.*zip" | cut -d : -f 2,3 | tr -d \" | wget -qi -
+cd /var/www/ && sudo curl -s https://api.github.com/repos/3liz/lizmap-web-client/releases/latest | grep "browser_download_url.*zip" | cut -d : -f 2,3 | tr -d \" | wget -qi -
 ```
 
 > **Next steps:** After downloading, unzip the archive, configure your Nginx virtual host, and adjust `lizmap/var/config/lizmapConfig.ini.php` and `localconfig.ini.php`. Detailed instructions are available in the [official Lizmap documentation](https://docs.lizmap.com/current/en/install/linux.html). **Nginx virtual host configuration is not covered in this guide.**
