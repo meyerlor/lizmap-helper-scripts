@@ -80,6 +80,21 @@ preserve_files() {
         cp -r "$instance_path/lizmap/var/config" "$temp_dir/preserved/"
         print_status "Preserved lizmap configuration"
     fi
+
+    # Preserve admin-uploaded header/logo/background images and theme config
+    # (set via the admin UI: header logo, header background image, etc.).
+    # Stored under lizmap/var/lizmap-theme-config/ and referenced by
+    # lizmapTheme.class.php — without this, custom branding is lost on upgrade.
+    if [[ -d "$instance_path/lizmap/var/lizmap-theme-config" ]]; then
+        cp -r "$instance_path/lizmap/var/lizmap-theme-config" "$temp_dir/preserved/"
+        print_status "Preserved lizmap theme config (header/logo/background)"
+    fi
+
+    # Preserve my-packages (custom Composer packages added per-instance)
+    if [[ -d "$instance_path/lizmap/my-packages" ]]; then
+        cp -r "$instance_path/lizmap/my-packages" "$temp_dir/preserved/"
+        print_status "Preserved my-packages"
+    fi
     
     # Preserve database
     if [[ -f "$instance_path/lizmap/var/db/jauth.db" ]]; then
@@ -92,10 +107,26 @@ preserve_files() {
         print_status "Preserved logs database"
     fi
     
-    # Preserve custom themes if they exist
+    # Preserve admin-added custom themes only (NOT the upstream 'default'
+    # theme, which must be replaced by every upgrade so default-theme
+    # changes shipped with the new Lizmap version take effect).
     if [[ -d "$instance_path/lizmap/www/themes" ]]; then
-        cp -r "$instance_path/lizmap/www/themes" "$temp_dir/preserved/"
-        print_status "Preserved custom themes"
+        local preserved_any_theme=0
+        while IFS= read -r -d '' theme_dir; do
+            theme_name=$(basename "$theme_dir")
+            if [[ "$theme_name" == "default" ]]; then
+                continue
+            fi
+            mkdir -p "$temp_dir/preserved/themes"
+            cp -r "$theme_dir" "$temp_dir/preserved/themes/"
+            preserved_any_theme=1
+        done < <(find "$instance_path/lizmap/www/themes" -mindepth 1 -maxdepth 1 -type d -print0)
+
+        if [[ $preserved_any_theme -eq 1 ]]; then
+            print_status "Preserved custom (non-default) themes"
+        else
+            print_status "No non-default themes to preserve (default theme will be refreshed from the new zip)"
+        fi
     fi
     
     # Preserve any custom modifications in www/css or www/js
@@ -164,6 +195,19 @@ restore_files() {
         cp -r "$temp_dir/preserved/config" "$instance_path/lizmap/var/"
         print_status "Restored lizmap configuration"
     fi
+
+    # Restore admin-uploaded header/logo/background images and theme config
+    if [[ -d "$temp_dir/preserved/lizmap-theme-config" ]]; then
+        rm -rf "$instance_path/lizmap/var/lizmap-theme-config"
+        cp -r "$temp_dir/preserved/lizmap-theme-config" "$instance_path/lizmap/var/"
+        print_status "Restored lizmap theme config (header/logo/background)"
+    fi
+
+    # Restore my-packages
+    if [[ -d "$temp_dir/preserved/my-packages" ]]; then
+        cp -r "$temp_dir/preserved/my-packages" "$instance_path/lizmap/"
+        print_status "Restored my-packages"
+    fi
     
     # Restore databases
     if [[ -f "$temp_dir/preserved/jauth.db" ]]; then
@@ -176,10 +220,15 @@ restore_files() {
         print_status "Restored logs database"
     fi
     
-    # Restore themes
+    # Restore admin-added themes (the upstream 'default' theme intentionally
+    # never enters $temp_dir/preserved/themes during preserve_files, so it
+    # is left alone here and serves the freshly extracted version).
     if [[ -d "$temp_dir/preserved/themes" ]]; then
-        cp -r "$temp_dir/preserved/themes" "$instance_path/lizmap/www/"
-        print_status "Restored custom themes"
+        mkdir -p "$instance_path/lizmap/www/themes"
+        while IFS= read -r -d '' theme_dir; do
+            cp -r "$theme_dir" "$instance_path/lizmap/www/themes/"
+        done < <(find "$temp_dir/preserved/themes" -mindepth 1 -maxdepth 1 -type d -print0)
+        print_status "Restored custom (non-default) themes"
     fi
     
     # Restore custom CSS/JS
@@ -327,13 +376,13 @@ main() {
     echo ""
     print_warning "This will upgrade the Lizmap instance: $1"
     print_warning "Using the ZIP file: $2"
-    read -p "Do you want to continue? (y/N): " -n 1 -r
-    echo ""
-    
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_status "Upgrade cancelled by user"
-        exit 0
-    fi
+    #read -p "Do you want to continue? (y/N): " -n 1 -r
+   #echo ""
+   #
+   #if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+   #    print_status "Upgrade cancelled by user"
+   #    exit 0
+   #fi
     
     # Create temporary directory
     TEMP_DIR=$(mktemp -d)
